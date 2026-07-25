@@ -251,7 +251,7 @@ function firstCategoryName(categories: Category[], type: TransactionType) {
 }
 
 const emptyForm = (businesses: Business[], categories: Category[] = initialCategories): FormState => ({
-  date: "2026-07-24",
+  date: todayISO(),
   type: "income",
   title: "",
   category: firstCategoryName(categories, "income"),
@@ -272,6 +272,14 @@ function currency(value: number) {
 
 function monthKey(date: string) {
   return date.slice(0, 7);
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function currentMonthKey() {
+  return new Date().toISOString().slice(0, 7);
 }
 
 function getTransactionShares(transaction: Transaction, businesses: Business[]) {
@@ -347,8 +355,10 @@ export default function Home() {
   const [businesses, setBusinesses] = useState<Business[]>(initialBusinesses);
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [selectedMonth, setSelectedMonth] = useState("2026-07");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [selectedBusiness, setSelectedBusiness] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
   const [form, setForm] = useState<FormState>(() => emptyForm(initialBusinesses));
   const [newBusinessName, setNewBusinessName] = useState("");
@@ -372,15 +382,31 @@ export default function Home() {
   }, [businesses, transactions, categories]);
 
   const filteredTransactions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return transactions.filter((transaction) => {
       const monthMatch = monthKey(transaction.date) === selectedMonth;
       const businessMatch =
         selectedBusiness === "all" ||
         transaction.businessId === selectedBusiness ||
         transaction.allocations?.some((allocation) => allocation.businessId === selectedBusiness);
-      return monthMatch && businessMatch;
+      if (!monthMatch || !businessMatch) return false;
+      if (!query) return true;
+
+      const relatedBusinessNames = transaction.allocations?.length
+        ? transaction.allocations.map((allocation) => businesses.find((business) => business.id === allocation.businessId)?.name ?? "").join(" ")
+        : (businesses.find((business) => business.id === transaction.businessId)?.name ?? "");
+      const haystack = `${transaction.title} ${transaction.category} ${relatedBusinessNames}`.toLowerCase();
+      return haystack.includes(query);
     });
-  }, [transactions, selectedMonth, selectedBusiness]);
+  }, [transactions, selectedMonth, selectedBusiness, searchQuery, businesses]);
+
+  const pendingNotifications = useMemo(
+    () =>
+      [...transactions]
+        .filter((transaction) => transaction.status === "pending_receive" || transaction.status === "pending_pay")
+        .sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [transactions],
+  );
   const categoriesByType = useMemo(() => {
     return categories.reduce(
       (grouped, category) => {
@@ -431,16 +457,16 @@ export default function Home() {
     total.receivable > 0 ? `มีเงินค้างรับรวม ${currency(total.receivable)}` : "ไม่มีเงินค้างรับในเดือนนี้",
   ];
 
-  function openCreateTransaction(type: TransactionType = "income") {
+  function openCreateTransaction(type: TransactionType = "income", status?: Status) {
     if (businesses.length === 0) {
       setActiveView("businesses");
       return;
     }
 
-    const next = emptyForm(businesses);
+    const next = emptyForm(businesses, categories);
     next.type = type;
     next.category = firstCategoryName(categories, type);
-    next.status = type === "income" || type === "owner_contribution" ? "received" : "paid";
+    next.status = status ?? (type === "income" || type === "owner_contribution" ? "received" : "paid");
     setForm(next);
     setIsTransactionOpen(true);
   }
@@ -596,7 +622,12 @@ export default function Home() {
           </div>
           <label className="search-box">
             <span>⌕</span>
-            <input aria-label="ค้นหาเร็ว" placeholder="ค้นหารายการ ธุรกิจ หรือหมวด" />
+            <input
+              aria-label="ค้นหาเร็ว"
+              placeholder="ค้นหารายการ ธุรกิจ หรือหมวด"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
           </label>
           <div className="filters">
             <input aria-label="เลือกเดือน" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
@@ -611,7 +642,43 @@ export default function Home() {
             <button className="primary-button" onClick={() => openCreateTransaction()}>
               <span>＋</span> เพิ่มรายการ
             </button>
-            <button className="icon-pill" aria-label="แจ้งเตือน" type="button">○</button>
+            <div className="notification-wrap">
+              <button className="icon-pill" aria-label="แจ้งเตือน" type="button" onClick={() => setIsNotificationsOpen((open) => !open)}>
+                ○{pendingNotifications.length > 0 && <b>{pendingNotifications.length}</b>}
+              </button>
+              {isNotificationsOpen && (
+                <>
+                  <div className="notification-backdrop" onClick={() => setIsNotificationsOpen(false)} />
+                  <div className="panel notification-dropdown" role="menu" aria-label="รายการค้างชำระ">
+                    <div className="section-title">
+                      <h2>รายการค้างชำระ</h2>
+                      <span>{pendingNotifications.length} รายการ</span>
+                    </div>
+                    {pendingNotifications.length ? (
+                      <div className="notification-list">
+                        {pendingNotifications.slice(0, 6).map((transaction) => (
+                          <button
+                            type="button"
+                            key={transaction.id}
+                            className="notification-item"
+                            onClick={() => {
+                              openEditTransaction(transaction);
+                              setIsNotificationsOpen(false);
+                            }}
+                          >
+                            <span>{transaction.title}</span>
+                            <b>{currency(transaction.amount)}</b>
+                            <small>{statusLabels[transaction.status]}</small>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted-note">ไม่มีรายการค้างชำระ</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -695,7 +762,13 @@ export default function Home() {
                   <TransactionList transactions={filteredTransactions.slice(0, 6)} businesses={businesses} onEdit={openEditTransaction} onDelete={(id) => setTransactions((items) => items.filter((item) => item.id !== id))} compact />
                 </div>
 
-                <RightRail total={total} transactions={filteredTransactions.slice(0, 7)} businesses={businesses} onAdd={() => openCreateTransaction()} />
+                <RightRail
+                  total={total}
+                  transactions={filteredTransactions.slice(0, 7)}
+                  businesses={businesses}
+                  onAdd={() => openCreateTransaction()}
+                  onQuickAction={openCreateTransaction}
+                />
               </section>
             )}
 
@@ -827,9 +900,27 @@ export default function Home() {
                   <h2>Support</h2>
                   <p className="support-copy">ส่งคำถามหรือรายการที่อยากให้ช่วยตรวจผ่านช่องทางที่คุณใช้ประจำ พร้อมแนบยอดหรือภาพหน้าจอได้</p>
                   <div className="support-actions">
-                    <button type="button">คู่มือเริ่มต้น</button>
-                    <button type="button">แจ้งปัญหา</button>
-                    <button type="button">ขอฟีเจอร์ใหม่</button>
+                    <button type="button" onClick={() => setActiveView("learning")}>คู่มือเริ่มต้น</button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.open(
+                          `mailto:?subject=${encodeURIComponent("ProfitLens - แจ้งปัญหา")}&body=${encodeURIComponent("อธิบายปัญหาที่พบ:\n")}`,
+                        )
+                      }
+                    >
+                      แจ้งปัญหา
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.open(
+                          `mailto:?subject=${encodeURIComponent("ProfitLens - ขอฟีเจอร์ใหม่")}&body=${encodeURIComponent("ฟีเจอร์ที่อยากให้เพิ่ม:\n")}`,
+                        )
+                      }
+                    >
+                      ขอฟีเจอร์ใหม่
+                    </button>
                   </div>
                 </div>
                 <div className="overview-card">
@@ -1061,11 +1152,13 @@ function RightRail({
   transactions,
   businesses,
   onAdd,
+  onQuickAction,
 }: {
   total: { income: number; expense: number; realProfit: number; cash: number; receivable: number; payable: number };
   transactions: Transaction[];
   businesses: Business[];
   onAdd: () => void;
+  onQuickAction: (type: TransactionType, status: Status) => void;
 }) {
   const cashRatio = total.income ? Math.min(Math.max((total.cash / total.income) * 100, 8), 100) : 8;
   const healthScore = total.income ? Math.max(Math.min(Math.round((total.realProfit / total.income) * 100 + 55), 98), 12) : 0;
@@ -1086,10 +1179,10 @@ function RightRail({
           <small>Cash balance · {new Date().getFullYear()}</small>
         </div>
         <div className="quick-payment">
-          <button type="button">รับเงิน</button>
-          <button type="button">จ่ายเงิน</button>
-          <button type="button">ค้างรับ</button>
-          <button type="button">ค้างจ่าย</button>
+          <button type="button" onClick={() => onQuickAction("income", "received")}>รับเงิน</button>
+          <button type="button" onClick={() => onQuickAction("expense", "paid")}>จ่ายเงิน</button>
+          <button type="button" onClick={() => onQuickAction("income", "pending_receive")}>ค้างรับ</button>
+          <button type="button" onClick={() => onQuickAction("expense", "pending_pay")}>ค้างจ่าย</button>
         </div>
       </section>
 
