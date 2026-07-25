@@ -118,6 +118,11 @@ button {
   gap: 8px;
 }
 
+.nav-group {
+  display: grid;
+  gap: 4px;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -134,6 +139,19 @@ button {
   font-weight: 700;
 }
 
+.nav-item b,
+.nav-submenu b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #101512;
+  color: #ffffff;
+  font-size: 10px;
+}
+
 .nav-item span {
   display: grid;
   place-items: center;
@@ -145,6 +163,27 @@ button {
   background: #eff2eb;
   color: #101512;
   box-shadow: inset 3px 0 0 #101512;
+}
+
+.nav-submenu {
+  display: grid;
+  gap: 2px;
+  margin: -2px 0 8px 28px;
+  border-left: 1px solid #d7ddd2;
+  padding-left: 12px;
+}
+
+.nav-submenu button {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  border: 0;
+  background: transparent;
+  color: #596158;
+  padding: 0;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .content {
@@ -909,6 +948,89 @@ select {
   font-size: 12px;
 }
 
+.feature-hero {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgb(154 200 63 / 0.16), transparent 42%),
+    #ffffff;
+  padding: 22px;
+}
+
+.feature-hero h2 {
+  max-width: 720px;
+  font-size: 24px;
+}
+
+.feature-card-grid,
+.feature-layout,
+.learning-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.feature-layout {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.feature-card {
+  display: grid;
+  gap: 8px;
+}
+
+.feature-card span,
+.learning-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.feature-card strong {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.feature-card p,
+.learning-card p,
+.support-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.budget-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.learning-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.learning-card {
+  display: grid;
+  gap: 10px;
+}
+
+.support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.support-actions button {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0 12px;
+  font-weight: 900;
+}
+
 .business-manage-list {
   display: grid;
   gap: 10px;
@@ -1111,7 +1233,10 @@ select {
   .kpi-grid,
   .business-grid,
   .reports-grid,
-  .category-grid {
+  .category-grid,
+  .feature-card-grid,
+  .feature-layout,
+  .learning-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1163,6 +1288,9 @@ select {
   .kpi-grid,
   .business-grid,
   .reports-grid,
+  .feature-card-grid,
+  .feature-layout,
+  .learning-grid,
   .form-grid,
   .type-picker {
     grid-template-columns: 1fr;
@@ -1218,12 +1346,16 @@ select {
     place-items: center;
     gap: 2px;
     min-height: 54px;
+    min-width: 0;
     border: 0;
     border-radius: 12px;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bottom-nav button.active {

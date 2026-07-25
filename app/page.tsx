@@ -546,11 +546,16 @@ export default function Home() {
   }
 
   const navItems = [
-    { id: "overview", label: "ภาพรวม", icon: "⌂" },
-    { id: "transactions", label: "รายการ", icon: "≡" },
-    { id: "reports", label: "รายงาน", icon: "▥" },
+    { id: "overview", label: "Dashboard", icon: "▦" },
+    { id: "accounts", label: "Accounts", icon: "♙" },
+    { id: "transactions", label: "Transactions", icon: "⇄", badge: transactions.length },
+    { id: "cashflow", label: "Cash flow", icon: "▱" },
+    { id: "budget", label: "Budget", icon: "♧" },
+    { id: "investments", label: "Investments", icon: "▣" },
     { id: "categories", label: "หมวดหมู่", icon: "◫" },
     { id: "businesses", label: "ธุรกิจ", icon: "●" },
+    { id: "learning", label: "Learning center", icon: "□" },
+    { id: "support", label: "Support", icon: "♧" },
   ];
 
   return (
@@ -565,10 +570,20 @@ export default function Home() {
         </div>
         <nav>
           {navItems.map((item) => (
-            <button className={activeView === item.id ? "nav-item active" : "nav-item"} key={item.id} onClick={() => setActiveView(item.id)}>
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
+            <div className="nav-group" key={item.id}>
+              <button className={activeView === item.id ? "nav-item active" : "nav-item"} onClick={() => setActiveView(item.id)}>
+                <span>{item.icon}</span>
+                {item.label}
+                {"badge" in item && <b>{item.badge}</b>}
+              </button>
+              {item.id === "transactions" && (
+                <div className="nav-submenu">
+                  <button type="button" onClick={() => setActiveView("transactions")}>History <b>{transactions.length}</b></button>
+                  <button type="button" onClick={() => setActiveView("accounts")}>Integration</button>
+                  <button type="button" onClick={() => setActiveView("reports")}>Reports</button>
+                </div>
+              )}
+            </div>
           ))}
         </nav>
       </aside>
@@ -720,6 +735,114 @@ export default function Home() {
               </section>
             )}
 
+            {activeView === "accounts" && (
+              <FeatureGrid
+                title="Accounts"
+                intro="รวมสถานะบัญชี เงินสด และแหล่งเงินของแต่ละธุรกิจ"
+                cards={[
+                  ["บัญชีเงินสด", total.cash, "ยอดเงินสดที่รับจริงหักจ่ายจริง"],
+                  ["เงินค้างรับ", total.receivable, "ยอดที่ออกใบแจ้งหนี้แล้วยังไม่รับ"],
+                  ["เงินค้างจ่าย", total.payable, "ยอดที่บันทึกแล้วแต่ยังไม่จ่าย"],
+                ]}
+              />
+            )}
+
+            {activeView === "cashflow" && (
+              <section className="view-stack">
+                <FeatureGrid
+                  title="Cash flow"
+                  intro="ดูเงินเข้าออกจริงเพื่อแยกกำไรออกจากเงินหมุน"
+                  cards={[
+                    ["เงินสดคงเหลือ", total.cash, "รับจริง - จ่ายจริง + เงินเจ้าของ"],
+                    ["เงินเข้าเดือนนี้", total.income, "รวมรายรับของเดือนที่เลือก"],
+                    ["เงินออกเดือนนี้", total.cost + total.expense, "ต้นทุนและค่าใช้จ่ายรวม"],
+                  ]}
+                />
+                <div className="overview-card">
+                  <div className="section-title">
+                    <h2>Cash movement</h2>
+                    <span>{filteredTransactions.length} รายการ</span>
+                  </div>
+                  <MiniChart summaries={visibleSummaries} total={total} />
+                </div>
+              </section>
+            )}
+
+            {activeView === "budget" && (
+              <section className="feature-layout">
+                <div className="overview-card">
+                  <div className="section-title">
+                    <h2>Budget planner</h2>
+                    <span>{margin.toFixed(1)}% margin</span>
+                  </div>
+                  <div className="budget-list">
+                    <BarRow label="ต้นทุนไม่เกิน 55% ของรายได้" value={total.cost} max={Math.max(total.income * 0.55, total.cost, 1)} color="#f6b34b" />
+                    <BarRow label="ค่าใช้จ่ายไม่เกิน 25% ของรายได้" value={total.expense} max={Math.max(total.income * 0.25, total.expense, 1)} color="#f17a62" />
+                    <BarRow label="กันเงินสดขั้นต่ำ 20%" value={total.cash} max={Math.max(total.income * 0.2, total.cash, 1)} color="#9ac83f" />
+                  </div>
+                </div>
+                <div className="overview-card">
+                  <h2>คำแนะนำเร็ว</h2>
+                  <div className="insights">
+                    <p>ถ้าค่าใช้จ่ายเกิน 25% ให้เริ่มจากหมวดที่สูงที่สุดก่อน</p>
+                    <p>เงินค้างรับสูงควรติดตามรอบรับเงินให้ชัดเจน</p>
+                    <p>แยกเงินเจ้าของออกจากรายได้เสมอเพื่อเห็นกำไรจริง</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activeView === "investments" && (
+              <FeatureGrid
+                title="Investments"
+                intro="พื้นที่ติดตามเงินที่กันไว้สำหรับลงทุนหรือขยายธุรกิจ"
+                cards={[
+                  ["กำไรที่นำไปต่อยอดได้", Math.max(total.realProfit, 0), "กำไรจริงหลังหักต้นทุนและค่าใช้จ่าย"],
+                  ["เงินสดสำรอง", total.cash, "ใช้วางแผนสภาพคล่องก่อนลงทุน"],
+                  ["ภาระค้างจ่าย", total.payable, "ควรหักออกก่อนตัดสินใจลงทุน"],
+                ]}
+              />
+            )}
+
+            {activeView === "learning" && (
+              <section className="learning-grid">
+                {[
+                  ["กำไรกับเงินสดต่างกันอย่างไร", "กำไรดีไม่ได้แปลว่ามีเงินสดพอ ถ้ายังมีค้างรับสูง"],
+                  ["แยกเงินเจ้าของอย่างไร", "ใช้ประเภทรายการเจ้าของเติมเงินและถอนเงิน ไม่ปนกับรายได้"],
+                  ["อ่านค่า margin", "Margin = กำไรจริง / รายได้ ใช้เปรียบเทียบธุรกิจต่างขนาด"],
+                  ["ควบคุมค่าใช้จ่าย", "ดูรายงานค่าใช้จ่ายสูงสุด แล้วตั้งงบเป็นรายหมวด"],
+                ].map(([title, detail]) => (
+                  <article className="overview-card learning-card" key={title}>
+                    <span>บทเรียน</span>
+                    <h2>{title}</h2>
+                    <p>{detail}</p>
+                  </article>
+                ))}
+              </section>
+            )}
+
+            {activeView === "support" && (
+              <section className="feature-layout">
+                <div className="overview-card">
+                  <h2>Support</h2>
+                  <p className="support-copy">ส่งคำถามหรือรายการที่อยากให้ช่วยตรวจผ่านช่องทางที่คุณใช้ประจำ พร้อมแนบยอดหรือภาพหน้าจอได้</p>
+                  <div className="support-actions">
+                    <button type="button">คู่มือเริ่มต้น</button>
+                    <button type="button">แจ้งปัญหา</button>
+                    <button type="button">ขอฟีเจอร์ใหม่</button>
+                  </div>
+                </div>
+                <div className="overview-card">
+                  <h2>Checklist ก่อนขอความช่วยเหลือ</h2>
+                  <div className="insights">
+                    <p>ระบุเดือนและธุรกิจที่พบปัญหา</p>
+                    <p>บอกประเภทรายการและสถานะรับ/จ่าย</p>
+                    <p>แนบตัวเลขที่คาดหวังเทียบกับตัวเลขที่แอพแสดง</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {activeView === "categories" && (
               <section className="view-stack">
                 <form className="category-form" onSubmit={addCategory}>
@@ -792,7 +915,7 @@ export default function Home() {
       </section>
 
       <nav className="bottom-nav">
-        {navItems.map((item) => (
+        {navItems.filter((item) => ["overview", "transactions", "cashflow", "categories", "businesses"].includes(item.id)).map((item) => (
           <button className={activeView === item.id ? "active" : ""} key={item.id} onClick={() => setActiveView(item.id)}>
             <span>{item.icon}</span>
             {item.label}
@@ -1073,6 +1196,28 @@ function ReportCard({ title, rows }: { title: string; rows: [string, number][] }
         ))}
       </div>
     </div>
+  );
+}
+
+function FeatureGrid({ title, intro, cards }: { title: string; intro: string; cards: [string, number, string][] }) {
+  return (
+    <section className="view-stack">
+      <div className="feature-hero">
+        <div>
+          <span className="metric-label">{title}</span>
+          <h2>{intro}</h2>
+        </div>
+      </div>
+      <div className="feature-card-grid">
+        {cards.map(([label, value, detail]) => (
+          <article className="overview-card feature-card" key={label}>
+            <span>{label}</span>
+            <strong>{currency(value)}</strong>
+            <p>{detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
