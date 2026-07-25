@@ -2,18 +2,28 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("ProfitLens source includes the MVP dashboard surface", async () => {
+test("ProfitLens dashboard client includes the MVP dashboard surface", async () => {
+  const [dashboardClient, types] = await Promise.all([
+    readFile(new URL("../app/dashboard-client.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/types.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(dashboardClient, /ProfitLens/);
+  assert.match(dashboardClient, /กำไรจริงรวม/);
+  assert.match(dashboardClient, /เงินสดคงเหลือ/);
+  assert.match(dashboardClient, /ค้างรับ/);
+  assert.match(dashboardClient, /ค้างจ่าย/);
+  assert.match(types, /type TransactionType/);
+  assert.match(types, /owner_contribution/);
+  assert.match(types, /allocations/);
+  assert.doesNotMatch(dashboardClient, /localStorage/);
+});
+
+test("ProfitLens page.tsx is a real auth-gated entry point", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /ProfitLens/);
-  assert.match(page, /กำไรจริงรวม/);
-  assert.match(page, /เงินสดคงเหลือ/);
-  assert.match(page, /ค้างรับ/);
-  assert.match(page, /ค้างจ่าย/);
-  assert.match(page, /type TransactionType/);
-  assert.match(page, /owner_contribution/);
-  assert.match(page, /allocations/);
-  assert.match(page, /localStorage/);
+  assert.match(page, /requireUser/);
+  assert.match(page, /force-dynamic/);
 });
 
 test("project is configured for Vercel-compatible Next builds", async () => {
