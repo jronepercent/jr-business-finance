@@ -61,6 +61,13 @@ type FormState = {
   allocations: Record<string, string>;
 };
 
+type Category = {
+  id: string;
+  type: TransactionType;
+  name: string;
+  icon: string;
+};
+
 const businessColors = ["#2563EB", "#16A34A", "#F97316", "#9333EA", "#0891B2"];
 
 const typeLabels: Record<TransactionType, string> = {
@@ -87,6 +94,26 @@ const categoryOptions: Record<TransactionType, string[]> = {
   owner_withdrawal: ["ถอนใช้ส่วนตัว", "คืนทุน"],
   transfer: ["โอนระหว่างบัญชี", "ปรับยอดเงินสด"],
 };
+
+const initialCategories: Category[] = Object.entries(categoryOptions).flatMap(([type, names]) =>
+  names.map((name, index) => ({
+    id: `${type}-${index}`,
+    type: type as TransactionType,
+    name,
+    icon:
+      type === "income"
+        ? "↗"
+        : type === "cost"
+          ? "◧"
+          : type === "expense"
+            ? "↘"
+            : type === "owner_contribution"
+              ? "+"
+              : type === "owner_withdrawal"
+                ? "-"
+                : "⇄",
+  })),
+);
 
 const initialBusinesses: Business[] = [
   { id: "biz-a", name: "ธุรกิจ A", color: "#2563EB" },
@@ -219,11 +246,15 @@ const initialTransactions: Transaction[] = [
   },
 ];
 
-const emptyForm = (businesses: Business[]): FormState => ({
+function firstCategoryName(categories: Category[], type: TransactionType) {
+  return categories.find((category) => category.type === type)?.name ?? categoryOptions[type][0] ?? "";
+}
+
+const emptyForm = (businesses: Business[], categories: Category[] = initialCategories): FormState => ({
   date: "2026-07-24",
   type: "income",
   title: "",
-  category: "ขายสินค้า",
+  category: firstCategoryName(categories, "income"),
   amount: "",
   status: "received",
   businessId: businesses[0]?.id ?? "",
@@ -315,25 +346,30 @@ export default function Home() {
   const [activeView, setActiveView] = useState("overview");
   const [businesses, setBusinesses] = useState<Business[]>(initialBusinesses);
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [selectedMonth, setSelectedMonth] = useState("2026-07");
   const [selectedBusiness, setSelectedBusiness] = useState("all");
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
   const [form, setForm] = useState<FormState>(() => emptyForm(initialBusinesses));
   const [newBusinessName, setNewBusinessName] = useState("");
   const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState({ type: "income" as TransactionType, name: "", icon: "↗" });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("profitlens-data");
     if (!saved) return;
-    const parsed = JSON.parse(saved) as { businesses: Business[]; transactions: Transaction[] };
+    const parsed = JSON.parse(saved) as { businesses: Business[]; transactions: Transaction[]; categories?: Category[] };
     setBusinesses(parsed.businesses);
     setTransactions(parsed.transactions);
-    setForm(emptyForm(parsed.businesses));
+    const savedCategories = parsed.categories?.length ? parsed.categories : initialCategories;
+    setCategories(savedCategories);
+    setForm(emptyForm(parsed.businesses, savedCategories));
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("profitlens-data", JSON.stringify({ businesses, transactions }));
-  }, [businesses, transactions]);
+    window.localStorage.setItem("profitlens-data", JSON.stringify({ businesses, transactions, categories }));
+  }, [businesses, transactions, categories]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
@@ -345,6 +381,22 @@ export default function Home() {
       return monthMatch && businessMatch;
     });
   }, [transactions, selectedMonth, selectedBusiness]);
+  const categoriesByType = useMemo(() => {
+    return categories.reduce(
+      (grouped, category) => {
+        grouped[category.type].push(category);
+        return grouped;
+      },
+      {
+        income: [],
+        cost: [],
+        expense: [],
+        owner_contribution: [],
+        owner_withdrawal: [],
+        transfer: [],
+      } as Record<TransactionType, Category[]>,
+    );
+  }, [categories]);
 
   const summaries = useMemo(() => buildSummaries(businesses, filteredTransactions), [businesses, filteredTransactions]);
   const visibleSummaries = selectedBusiness === "all" ? summaries : summaries.filter((item) => item.business.id === selectedBusiness);
@@ -387,7 +439,7 @@ export default function Home() {
 
     const next = emptyForm(businesses);
     next.type = type;
-    next.category = categoryOptions[type][0];
+    next.category = firstCategoryName(categories, type);
     next.status = type === "income" || type === "owner_contribution" ? "received" : "paid";
     setForm(next);
     setIsTransactionOpen(true);
@@ -464,10 +516,40 @@ export default function Home() {
     setTransactions((items) => items.filter((item) => item.businessId !== id && !item.allocations?.some((allocation) => allocation.businessId === id)));
   }
 
+  function addCategory(event: FormEvent) {
+    event.preventDefault();
+    const name = newCategory.name.trim();
+    const icon = newCategory.icon.trim() || "•";
+    if (!name) return;
+    setCategories((items) => [...items, { id: crypto.randomUUID(), type: newCategory.type, name, icon }]);
+    setNewCategory((current) => ({ ...current, name: "" }));
+  }
+
+  function updateCategory(id: string, name: string, icon: string) {
+    const nextName = name.trim();
+    if (!nextName) return;
+    setCategories((items) => items.map((item) => (item.id === id ? { ...item, name: nextName, icon: icon.trim() || "•" } : item)));
+    setTransactions((items) => items.map((item) => {
+      const previous = categories.find((category) => category.id === id);
+      return previous && item.category === previous.name ? { ...item, category: nextName } : item;
+    }));
+    setEditingCategoryId(null);
+  }
+
+  function deleteCategory(id: string) {
+    const category = categories.find((item) => item.id === id);
+    if (!category) return;
+    const fallback = categories.find((item) => item.type === category.type && item.id !== id)?.name ?? "";
+    setCategories((items) => items.filter((item) => item.id !== id));
+    setTransactions((items) => items.map((item) => (item.category === category.name ? { ...item, category: fallback } : item)));
+    setForm((current) => (current.category === category.name ? { ...current, category: fallback } : current));
+  }
+
   const navItems = [
     { id: "overview", label: "ภาพรวม", icon: "⌂" },
     { id: "transactions", label: "รายการ", icon: "≡" },
     { id: "reports", label: "รายงาน", icon: "▥" },
+    { id: "categories", label: "หมวดหมู่", icon: "◫" },
     { id: "businesses", label: "ธุรกิจ", icon: "●" },
   ];
 
@@ -638,6 +720,46 @@ export default function Home() {
               </section>
             )}
 
+            {activeView === "categories" && (
+              <section className="view-stack">
+                <form className="category-form" onSubmit={addCategory}>
+                  <select value={newCategory.type} onChange={(event) => setNewCategory((current) => ({ ...current, type: event.target.value as TransactionType }))} aria-label="ประเภทหมวดหมู่">
+                    {(["income", "cost", "expense", "owner_contribution", "owner_withdrawal", "transfer"] as TransactionType[]).map((type) => (
+                      <option key={type} value={type}>{typeLabels[type]}</option>
+                    ))}
+                  </select>
+                  <input value={newCategory.icon} onChange={(event) => setNewCategory((current) => ({ ...current, icon: event.target.value }))} placeholder="ไอคอน" aria-label="ไอคอนหมวดหมู่" maxLength={3} />
+                  <input value={newCategory.name} onChange={(event) => setNewCategory((current) => ({ ...current, name: event.target.value }))} placeholder="ชื่อหมวดหมู่ใหม่" aria-label="ชื่อหมวดหมู่ใหม่" />
+                  <button className="primary-button" type="submit">เพิ่มหมวดหมู่</button>
+                </form>
+
+                <div className="category-grid">
+                  {(["income", "cost", "expense", "owner_contribution", "owner_withdrawal", "transfer"] as TransactionType[]).map((type) => (
+                    <section className="overview-card category-panel" key={type}>
+                      <div className="section-title">
+                        <h2>{typeLabels[type]}</h2>
+                        <span>{categoriesByType[type].length} หมวด</span>
+                      </div>
+                      <div className="category-list">
+                        {categoriesByType[type].map((category) => (
+                          <CategoryEditor
+                            key={category.id}
+                            category={category}
+                            isEditing={editingCategoryId === category.id}
+                            onEdit={() => setEditingCategoryId(category.id)}
+                            onCancel={() => setEditingCategoryId(null)}
+                            onSave={updateCategory}
+                            onDelete={deleteCategory}
+                          />
+                        ))}
+                        {categoriesByType[type].length === 0 && <p className="muted-note">ยังไม่มีหมวดในประเภทนี้</p>}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {activeView === "businesses" && (
               <section className="view-stack">
                 {businesses.length === 0 && (
@@ -695,7 +817,7 @@ export default function Home() {
                   type="button"
                   className={form.type === type ? "active" : ""}
                   key={type}
-                  onClick={() => setForm((current) => ({ ...current, type, category: categoryOptions[type][0], status: type === "income" || type === "owner_contribution" ? "received" : "paid" }))}
+                  onClick={() => setForm((current) => ({ ...current, type, category: firstCategoryName(categories, type), status: type === "income" || type === "owner_contribution" ? "received" : "paid" }))}
                 >
                   {typeLabels[type]}
                 </button>
@@ -718,8 +840,8 @@ export default function Home() {
               <label>
                 หมวด
                 <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>
-                  {categoryOptions[form.type].map((category) => (
-                    <option key={category}>{category}</option>
+                  {categoriesByType[form.type].map((category) => (
+                    <option key={category.id} value={category.name}>{category.icon} {category.name}</option>
                   ))}
                 </select>
               </label>
@@ -1003,6 +1125,45 @@ function BusinessEditor({
       <strong>{business.name}</strong>
       <button onClick={onEdit}>แก้ไข</button>
       <button onClick={() => onDelete(business.id)}>ลบ</button>
+    </article>
+  );
+}
+
+function CategoryEditor({
+  category,
+  isEditing,
+  onEdit,
+  onCancel,
+  onSave,
+  onDelete,
+}: {
+  category: Category;
+  isEditing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onSave: (id: string, name: string, icon: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [name, setName] = useState(category.name);
+  const [icon, setIcon] = useState(category.icon);
+
+  if (isEditing) {
+    return (
+      <form className="category-editor editing" onSubmit={(event) => { event.preventDefault(); onSave(category.id, name, icon); }}>
+        <input value={icon} onChange={(event) => setIcon(event.target.value)} aria-label="ไอคอนหมวดหมู่" maxLength={3} />
+        <input value={name} onChange={(event) => setName(event.target.value)} aria-label="ชื่อหมวดหมู่" />
+        <button type="submit">บันทึก</button>
+        <button type="button" onClick={onCancel}>ยกเลิก</button>
+      </form>
+    );
+  }
+
+  return (
+    <article className="category-editor">
+      <span>{category.icon}</span>
+      <strong>{category.name}</strong>
+      <button type="button" onClick={onEdit}>แก้ไข</button>
+      <button type="button" onClick={() => onDelete(category.id)}>ลบ</button>
     </article>
   );
 }
