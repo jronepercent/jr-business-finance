@@ -1535,7 +1535,7 @@ select option {
     width: 100%;
     min-height: 100dvh;
     margin: 0;
-    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    padding-bottom: calc(132px + env(safe-area-inset-bottom));
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -1549,7 +1549,7 @@ select option {
     padding:
       calc(16px + env(safe-area-inset-top))
       14px
-      calc(116px + env(safe-area-inset-bottom));
+      calc(156px + env(safe-area-inset-bottom));
   }
 
   h1 {
@@ -1617,59 +1617,204 @@ select option {
 
   .bottom-nav {
     position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: max(10px, env(safe-area-inset-left));
     z-index: 20;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    border-top: 1px solid var(--border);
+    isolation: isolate;
+    overflow: visible;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 24px;
     background:
-      linear-gradient(180deg, rgb(24 10 12 / 0.94), rgb(8 8 8 / 0.98));
-    padding:
-      6px
-      max(6px, env(safe-area-inset-right))
-      calc(8px + env(safe-area-inset-bottom))
-      max(6px, env(safe-area-inset-left));
-    box-shadow: 0 -18px 44px rgb(0 0 0 / 0.5), 0 -1px 0 rgb(239 35 50 / 0.18);
+      linear-gradient(180deg, rgb(30 12 15 / 0.9), rgb(7 7 8 / 0.94));
+    padding: 8px 10px;
+    box-shadow:
+      0 24px 70px rgb(0 0 0 / 0.62),
+      0 0 42px rgb(239 35 50 / 0.16),
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(22px) saturate(1.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.2);
+    transform: translateZ(0);
+    will-change: transform;
   }
 
   .bottom-nav button {
     display: grid;
     place-items: center;
-    gap: 2px;
-    min-height: 54px;
+    align-content: center;
+    gap: 5px;
+    min-height: 58px;
     min-width: 0;
     border: 0;
-    border-radius: var(--radius);
+    border-radius: 18px;
     background: transparent;
     color: var(--muted);
     font-size: 10px;
     font-weight: 900;
+    letter-spacing: 0.02em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition:
+      background 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .bottom-nav button.active {
-    color: var(--primary);
+    background:
+      radial-gradient(circle at 50% 0%, rgb(239 35 50 / 0.26), transparent 58%),
+      rgb(255 255 255 / 0.07);
+    color: #ffffff;
+    box-shadow: inset 0 0 0 1px rgb(239 35 50 / 0.22);
+  }
+
+  .bottom-nav button:active {
+    transform: translateY(1px);
+  }
+
+  .bottom-nav button > span {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    color: currentColor;
+  }
+
+  .bottom-nav button > span::before,
+  .bottom-nav button > span::after {
+    position: absolute;
+    display: block;
+    box-sizing: border-box;
+    content: "";
+  }
+
+  .bottom-nav button[data-nav-id="overview"] > span::before {
+    width: 17px;
+    height: 15px;
+    border: 1.8px solid currentColor;
+    border-radius: 5px;
+  }
+
+  .bottom-nav button[data-nav-id="overview"] > span::after {
+    width: 1.8px;
+    height: 15px;
+    background: currentColor;
+    box-shadow: 6px 0 0 currentColor;
+    opacity: 0.72;
+  }
+
+  .bottom-nav button[data-nav-id="transactions"] > span::before {
+    width: 17px;
+    height: 17px;
+    border: 1.8px solid currentColor;
+    border-radius: 999px;
+  }
+
+  .bottom-nav button[data-nav-id="transactions"] > span::after {
+    width: 13px;
+    height: 7px;
+    border-top: 1.8px solid currentColor;
+    border-bottom: 1.8px solid currentColor;
+    transform: rotate(-18deg);
+  }
+
+  .bottom-nav button[data-nav-id="cashflow"] > span::before {
+    width: 18px;
+    height: 12px;
+    border: 1.8px solid currentColor;
+    border-radius: 999px;
+  }
+
+  .bottom-nav button[data-nav-id="cashflow"] > span::after {
+    width: 6px;
+    height: 6px;
+    border: 1.8px solid currentColor;
+    border-top: 0;
+    border-left: 0;
+    transform: translateX(6px) rotate(-45deg);
+  }
+
+  .bottom-nav button[data-nav-id="categories"] > span::before {
+    width: 7px;
+    height: 7px;
+    border: 1.8px solid currentColor;
+    border-radius: 3px;
+    box-shadow:
+      10px 0 0 -1.8px #09090a,
+      10px 0 0 0 currentColor,
+      0 10px 0 -1.8px #09090a,
+      0 10px 0 0 currentColor,
+      10px 10px 0 -1.8px #09090a,
+      10px 10px 0 0 currentColor;
+  }
+
+  .bottom-nav button[data-nav-id="businesses"] > span::before {
+    width: 16px;
+    height: 13px;
+    border: 1.8px solid currentColor;
+    border-radius: 4px;
+    transform: translateY(2px);
+  }
+
+  .bottom-nav button[data-nav-id="businesses"] > span::after {
+    width: 8px;
+    height: 5px;
+    border: 1.8px solid currentColor;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    transform: translateY(-7px);
   }
 
   .bottom-nav .add-tab {
     position: absolute;
     left: 50%;
-    bottom: calc(68px + env(safe-area-inset-bottom));
-    width: 64px;
-    min-height: 58px;
-    transform: translateX(-50%);
-    background: var(--primary);
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 4px;
+    width: 70px;
+    min-height: 66px;
+    overflow: visible;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 50% 12%, rgb(255 255 255 / 0.25), transparent 28%),
+      linear-gradient(180deg, #ff3447, #d50f22);
     color: #ffffff;
-    font-size: 22px;
-    box-shadow: 0 18px 40px rgb(15 118 110 / 0.24);
+    font-size: 10px;
+    box-shadow:
+      0 20px 54px rgb(239 35 50 / 0.38),
+      inset 0 1px 0 rgb(255 255 255 / 0.26);
+    transform: translateX(-50%) translateZ(0);
   }
 
-  .bottom-nav .add-tab span {
-    font-size: 11px;
+  .bottom-nav .add-tab > span {
+    width: 24px;
+    height: 24px;
+  }
+
+  .bottom-nav .add-tab > span::before,
+  .bottom-nav .add-tab > span::after {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    content: "";
+    transform: translate(-50%, -50%);
+  }
+
+  .bottom-nav .add-tab > span::after {
+    transform: translate(-50%, -50%) rotate(90deg);
   }
 
   .bottom-nav button:nth-child(1) {

@@ -903,13 +903,20 @@ export default function DashboardClient({
 
       <nav className="bottom-nav">
         {navItems.filter((item) => ["overview", "transactions", "cashflow", "categories", "businesses"].includes(item.id)).map((item) => (
-          <button className={activeView === item.id ? "active" : ""} key={item.id} onClick={() => setActiveView(item.id)}>
-            <span>{item.icon}</span>
+          <button
+            className={activeView === item.id ? "active" : ""}
+            data-nav-id={item.id}
+            key={item.id}
+            onClick={() => setActiveView(item.id)}
+            type="button"
+          >
+            <span aria-hidden="true" />
             {item.label}
           </button>
         ))}
-        <button className="add-tab" onClick={() => openCreateTransaction()}>
-          ＋<span>เพิ่ม</span>
+        <button className="add-tab" onClick={() => openCreateTransaction()} type="button">
+          <span aria-hidden="true" />
+          เพิ่ม
         </button>
       </nav>
 
