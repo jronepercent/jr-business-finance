@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Business = {
   id: string;
@@ -492,6 +492,10 @@ export default function Home() {
             <p className="eyebrow">กรกฎาคม 2026</p>
             <h1>{activeView === "overview" ? "เดือนนี้ธุรกิจเป็นอย่างไร" : navItems.find((item) => item.id === activeView)?.label}</h1>
           </div>
+          <label className="search-box">
+            <span>⌕</span>
+            <input aria-label="ค้นหาเร็ว" placeholder="ค้นหารายการ ธุรกิจ หรือหมวด" />
+          </label>
           <div className="filters">
             <input aria-label="เลือกเดือน" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} />
             <select aria-label="เลือกธุรกิจ" value={selectedBusiness} onChange={(event) => setSelectedBusiness(event.target.value)}>
@@ -505,6 +509,7 @@ export default function Home() {
             <button className="primary-button" onClick={() => openCreateTransaction()}>
               <span>＋</span> เพิ่มรายการ
             </button>
+            <button className="icon-pill" aria-label="แจ้งเตือน" type="button">○</button>
           </div>
         </header>
 
@@ -513,52 +518,82 @@ export default function Home() {
         ) : (
           <>
             {activeView === "overview" && (
-              <section className="view-stack">
-                <div className="hero-metrics">
-                  <div>
-                    <span className="metric-label">กำไรจริงรวม</span>
-                    <strong>{currency(total.realProfit)}</strong>
-                    <span className="submetric">เงินสดคงเหลือ {currency(total.cash)} · Margin {margin.toFixed(1)}%</span>
+              <section className="dashboard-grid">
+                <div className="dashboard-main">
+                  <section className="overview-card balance-card">
+                    <div className="section-title">
+                      <div>
+                        <span className="metric-label">Profit overview</span>
+                        <h2>กำไรและเงินสดเดือนนี้</h2>
+                      </div>
+                      <div className="chart-legend">
+                        <span className="legend income-dot">รายได้</span>
+                        <span className="legend profit-dot">กำไร</span>
+                        <span className="legend expense-dot">เงินออก</span>
+                      </div>
+                    </div>
+                    <div className="balance-row">
+                      <div>
+                        <strong>{currency(total.realProfit)}</strong>
+                        <span>กำไรจริงรวม</span>
+                      </div>
+                      <div>
+                        <strong>{currency(total.cash)}</strong>
+                        <span>เงินสดคงเหลือ</span>
+                      </div>
+                    </div>
+                    <MiniChart summaries={visibleSummaries} total={total} />
+                  </section>
+
+                  <div className="kpi-grid">
+                    <Kpi label="รายได้" value={total.income} tone="income" />
+                    <Kpi label="ต้นทุน" value={total.cost} tone="cost" />
+                    <Kpi label="เงินออก" value={total.expense} tone="expense" />
+                    <Kpi label="กำไรขั้นต้น" value={total.grossProfit} tone="profit" />
+                    <Kpi label="ค้างรับ" value={total.receivable} tone="pending" />
+                    <Kpi label="ค้างจ่าย" value={total.payable} tone="pending" />
                   </div>
-                  <div className="insights">
-                    {insights.map((insight) => (
-                      <p key={insight}>{insight}</p>
-                    ))}
+
+                  <div className="dashboard-lower-grid">
+                    <section className="overview-card insight-card">
+                      <div className="section-title">
+                        <h2>Quick insights</h2>
+                        <span>{margin.toFixed(1)}% margin</span>
+                      </div>
+                      <div className="insights">
+                        {insights.map((insight) => (
+                          <p key={insight}>{insight}</p>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="overview-card">
+                      <div className="section-title">
+                        <h2>ธุรกิจของคุณ</h2>
+                        <span>{visibleSummaries.length} ธุรกิจ</span>
+                      </div>
+                      <div className="business-grid compact-business-grid">
+                        {visibleSummaries.map((item) => (
+                          <article className="business-card" key={item.business.id} style={{ borderTopColor: item.business.color }}>
+                            <div className="business-card-title">
+                              <span style={{ backgroundColor: item.business.color }} />
+                              <h3>{item.business.name}</h3>
+                            </div>
+                            <strong>{currency(item.realProfit)}</strong>
+                            <div className="business-stats">
+                              <span>เงินสด {currency(item.cash)}</span>
+                              <span>{item.margin.toFixed(1)}%</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
                   </div>
+
+                  <TransactionList transactions={filteredTransactions.slice(0, 6)} businesses={businesses} onEdit={openEditTransaction} onDelete={(id) => setTransactions((items) => items.filter((item) => item.id !== id))} compact />
                 </div>
 
-                <div className="kpi-grid">
-                  <Kpi label="รายได้" value={total.income} tone="income" />
-                  <Kpi label="ต้นทุน" value={total.cost} tone="cost" />
-                  <Kpi label="เงินออก" value={total.expense} tone="expense" />
-                  <Kpi label="กำไรขั้นต้น" value={total.grossProfit} tone="profit" />
-                  <Kpi label="ค้างรับ" value={total.receivable} tone="pending" />
-                  <Kpi label="ค้างจ่าย" value={total.payable} tone="pending" />
-                </div>
-
-                <section className="section-block">
-                  <div className="section-title">
-                    <h2>ธุรกิจของคุณ</h2>
-                    <span>{visibleSummaries.length} ธุรกิจ</span>
-                  </div>
-                  <div className="business-grid">
-                    {visibleSummaries.map((item) => (
-                      <article className="business-card" key={item.business.id} style={{ borderTopColor: item.business.color }}>
-                        <div className="business-card-title">
-                          <span style={{ backgroundColor: item.business.color }} />
-                          <h3>{item.business.name}</h3>
-                        </div>
-                        <strong>{currency(item.realProfit)}</strong>
-                        <div className="business-stats">
-                          <span>เงินสด {currency(item.cash)}</span>
-                          <span>Margin {item.margin.toFixed(1)}%</span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-
-                <TransactionList transactions={filteredTransactions.slice(0, 6)} businesses={businesses} onEdit={openEditTransaction} onDelete={(id) => setTransactions((items) => items.filter((item) => item.id !== id))} compact />
+                <RightRail total={total} transactions={filteredTransactions.slice(0, 7)} businesses={businesses} onAdd={() => openCreateTransaction()} />
               </section>
             )}
 
@@ -728,6 +763,121 @@ function Kpi({ label, value, tone }: { label: string; value: number; tone: strin
       <span>{label}</span>
       <strong>{currency(value)}</strong>
     </article>
+  );
+}
+
+function MiniChart({ summaries, total }: { summaries: BusinessSummary[]; total: { income: number; cost: number; expense: number; realProfit: number } }) {
+  const bars = summaries.length
+    ? summaries.map((summary) => ({
+        label: summary.business.name.replace("ธุรกิจ ", ""),
+        income: summary.income,
+        profit: Math.max(summary.realProfit, 0),
+        expense: summary.expense + summary.cost,
+      }))
+    : [
+        { label: "รายได้", income: total.income, profit: Math.max(total.realProfit, 0), expense: total.expense + total.cost },
+      ];
+  const max = Math.max(...bars.flatMap((bar) => [bar.income, bar.profit, bar.expense]), 1);
+
+  return (
+    <div className="mini-chart" aria-label="กราฟเปรียบเทียบรายได้ กำไร และเงินออก">
+      <div className="chart-grid-lines">
+        <span />
+        <span />
+        <span />
+      </div>
+      {bars.map((bar) => (
+        <div className="chart-group" key={bar.label}>
+          <div className="bars">
+            <span className="bar income-bar" style={{ height: `${Math.max((bar.income / max) * 100, 8)}%` }} title={`รายได้ ${currency(bar.income)}`} />
+            <span className="bar profit-bar" style={{ height: `${Math.max((bar.profit / max) * 100, 8)}%` }} title={`กำไร ${currency(bar.profit)}`} />
+            <span className="bar expense-bar" style={{ height: `${Math.max((bar.expense / max) * 100, 8)}%` }} title={`เงินออก ${currency(bar.expense)}`} />
+          </div>
+          <span>{bar.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RightRail({
+  total,
+  transactions,
+  businesses,
+  onAdd,
+}: {
+  total: { income: number; expense: number; realProfit: number; cash: number; receivable: number; payable: number };
+  transactions: Transaction[];
+  businesses: Business[];
+  onAdd: () => void;
+}) {
+  const cashRatio = total.income ? Math.min(Math.max((total.cash / total.income) * 100, 8), 100) : 8;
+  const healthScore = total.income ? Math.max(Math.min(Math.round((total.realProfit / total.income) * 100 + 55), 98), 12) : 0;
+
+  return (
+    <aside className="right-rail">
+      <section className="wallet-card">
+        <div className="section-title">
+          <div>
+            <span className="metric-label">Cash card</span>
+            <h2>เงินสดพร้อมใช้</h2>
+          </div>
+          <button className="small-action" onClick={onAdd} type="button">+ เพิ่ม</button>
+        </div>
+        <div className="debit-card">
+          <span>ProfitLens</span>
+          <strong>{currency(total.cash)}</strong>
+          <small>Cash balance · {new Date().getFullYear()}</small>
+        </div>
+        <div className="quick-payment">
+          <button type="button">รับเงิน</button>
+          <button type="button">จ่ายเงิน</button>
+          <button type="button">ค้างรับ</button>
+          <button type="button">ค้างจ่าย</button>
+        </div>
+      </section>
+
+      <section className="overview-card health-card">
+        <div className="section-title">
+          <h2>Financial health</h2>
+          <span>30d</span>
+        </div>
+        <div className="health-ring" style={{ "--score": `${healthScore}%` } as CSSProperties}>
+          <strong>{healthScore}%</strong>
+          <span>ความแข็งแรง</span>
+        </div>
+        <p>เงินสดเทียบรายได้ {cashRatio.toFixed(0)}% · ค้างรับ {currency(total.receivable)}</p>
+      </section>
+
+      <section className="overview-card goal-card">
+        <div className="section-title">
+          <h2>Goal tracker</h2>
+          <span>{businesses.length} ธุรกิจ</span>
+        </div>
+        <BarRow label="เงินสด" value={total.cash} max={Math.max(total.income, total.cash, 1)} color="#9ac83f" />
+        <BarRow label="ค้างรับ" value={total.receivable} max={Math.max(total.income, total.receivable, 1)} color="#ca8a04" />
+        <BarRow label="ค้างจ่าย" value={total.payable} max={Math.max(total.income, total.payable, 1)} color="#dc2626" />
+      </section>
+
+      <section className="overview-card rail-history">
+        <div className="section-title">
+          <h2>Transaction history</h2>
+          <span>ล่าสุด</span>
+        </div>
+        <div className="rail-transaction-list">
+          {transactions.map((transaction) => (
+            <div className="rail-transaction" key={transaction.id}>
+              <span className={`rail-icon ${transaction.type}`}>{typeLabels[transaction.type].slice(0, 1)}</span>
+              <div>
+                <strong>{transaction.title}</strong>
+                <small>{statusLabels[transaction.status]}</small>
+              </div>
+              <b>{currency(transaction.amount)}</b>
+            </div>
+          ))}
+        </div>
+      </section>
+    </aside>
   );
 }
 
