@@ -380,6 +380,11 @@ export default function Home() {
   ];
 
   function openCreateTransaction(type: TransactionType = "income") {
+    if (businesses.length === 0) {
+      setActiveView("businesses");
+      return;
+    }
+
     const next = emptyForm(businesses);
     next.type = type;
     next.category = categoryOptions[type][0];
@@ -513,7 +518,7 @@ export default function Home() {
           </div>
         </header>
 
-        {businesses.length === 0 ? (
+        {businesses.length === 0 && activeView !== "businesses" ? (
           <EmptyState title="เริ่มจากเพิ่มธุรกิจแรกของคุณ" action="เพิ่มธุรกิจ" onAction={() => setActiveView("businesses")} />
         ) : (
           <>
@@ -635,6 +640,12 @@ export default function Home() {
 
             {activeView === "businesses" && (
               <section className="view-stack">
+                {businesses.length === 0 && (
+                  <div className="empty-state compact-empty">
+                    <h2>เริ่มจากเพิ่มธุรกิจแรกของคุณ</h2>
+                    <p>ใส่ชื่อธุรกิจ แล้วค่อยเพิ่มเงินเข้า ต้นทุน หรือเงินออกได้ทันที</p>
+                  </div>
+                )}
                 <form className="business-form" onSubmit={addBusiness}>
                   <input value={newBusinessName} onChange={(event) => setNewBusinessName(event.target.value)} placeholder="ชื่อธุรกิจใหม่" aria-label="ชื่อธุรกิจใหม่" />
                   <button className="primary-button" type="submit">เพิ่มธุรกิจ</button>

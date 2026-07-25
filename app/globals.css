@@ -862,6 +862,16 @@ select {
   color: var(--muted);
 }
 
+.compact-empty {
+  justify-items: start;
+  padding: 22px;
+  text-align: left;
+}
+
+.compact-empty p {
+  margin-bottom: 0;
+}
+
 .bottom-nav {
   display: none;
 }
