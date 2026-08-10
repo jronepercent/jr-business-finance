@@ -614,7 +614,7 @@ export default function DashboardClient({
                     <div className="section-title">
                       <div>
                         <span className="metric-label">Profit overview</span>
-                        <h2>กำไรและเงินสดเดือนนี้</h2>
+                        <h2>ยอดขายและกำไรจริงเดือนนี้</h2>
                       </div>
                       <div className="chart-legend">
                         <span className="legend income-dot">รายได้</span>
@@ -624,12 +624,12 @@ export default function DashboardClient({
                     </div>
                     <div className="balance-row">
                       <div>
-                        <strong>{currency(total.realProfit)}</strong>
-                        <span>กำไรจริงรวม</span>
+                        <strong>{currency(total.income)}</strong>
+                        <span>ยอดขายรวม</span>
                       </div>
                       <div>
-                        <strong>{currency(total.cash)}</strong>
-                        <span>เงินสดคงเหลือ</span>
+                        <strong>{currency(total.realProfit)}</strong>
+                        <span>กำไรจริง</span>
                       </div>
                     </div>
                     <MiniChart summaries={visibleSummaries} total={total} />
