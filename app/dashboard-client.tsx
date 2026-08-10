@@ -109,6 +109,18 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function daysSince(date: string) {
+  const start = new Date(`${date}T00:00:00`);
+  const today = new Date(`${todayISO()}T00:00:00`);
+  return Math.max(Math.floor((today.getTime() - start.getTime()) / 86_400_000), 0);
+}
+
+function settledStatus(status: Status): Status {
+  if (status === "pending_receive") return "received";
+  if (status === "pending_pay") return "paid";
+  return status;
+}
+
 function getTransactionShares(transaction: Transaction, businesses: Business[]) {
   if (transaction.allocations?.length) {
     return transaction.allocations.filter((allocation) => allocation.percent > 0);
@@ -230,6 +242,10 @@ export default function DashboardClient({
         .filter((transaction) => transaction.status === "pending_receive" || transaction.status === "pending_pay")
         .sort((a, b) => (a.date < b.date ? 1 : -1)),
     [transactions],
+  );
+  const pendingActionItems = useMemo(
+    () => [...pendingNotifications].sort((a, b) => (a.date > b.date ? 1 : -1)),
+    [pendingNotifications],
   );
   const categoriesByType = useMemo(() => {
     return categories.reduce(
@@ -358,6 +374,33 @@ export default function DashboardClient({
         await deleteTransactionAction(id);
       } catch {
         setPendingError("ลบรายการไม่สำเร็จ กรุณาโหลดหน้าใหม่");
+      }
+    });
+  }
+
+  function settlePendingTransaction(transaction: Transaction) {
+    const nextStatus = settledStatus(transaction.status);
+    if (nextStatus === transaction.status) return;
+
+    const nextTransaction = { ...transaction, status: nextStatus };
+    setTransactions((items) => items.map((item) => (item.id === transaction.id ? nextTransaction : item)));
+    setPendingError(null);
+    startTransition(async () => {
+      try {
+        const saved = await updateTransactionAction(transaction.id, {
+          date: transaction.date,
+          type: transaction.type,
+          title: transaction.title,
+          category: transaction.category,
+          amount: transaction.amount,
+          status: nextStatus,
+          businessId: transaction.businessId,
+          allocations: transaction.allocations,
+        });
+        setTransactions((items) => items.map((item) => (item.id === transaction.id ? saved : item)));
+      } catch {
+        setTransactions((items) => items.map((item) => (item.id === transaction.id ? transaction : item)));
+        setPendingError("อัปเดตสถานะรายการค้างไม่สำเร็จ กรุณาลองใหม่");
       }
     });
   }
@@ -643,6 +686,13 @@ export default function DashboardClient({
                     <Kpi label="ค้างรับ" value={total.receivable} tone="pending" />
                     <Kpi label="ค้างจ่าย" value={total.payable} tone="pending" />
                   </div>
+
+                  <PendingActionCenter
+                    transactions={pendingActionItems.slice(0, 4)}
+                    businesses={businesses}
+                    onEdit={openEditTransaction}
+                    onSettle={settlePendingTransaction}
+                  />
 
                   <div className="dashboard-lower-grid">
                     <section className="overview-card insight-card">
@@ -1072,6 +1122,60 @@ function MiniChart({ summaries, total }: { summaries: BusinessSummary[]; total: 
         </div>
       ))}
     </div>
+  );
+}
+
+function PendingActionCenter({
+  transactions,
+  businesses,
+  onEdit,
+  onSettle,
+}: {
+  transactions: Transaction[];
+  businesses: Business[];
+  onEdit: (transaction: Transaction) => void;
+  onSettle: (transaction: Transaction) => void;
+}) {
+  const receivable = transactions.filter((transaction) => transaction.status === "pending_receive").reduce((sum, transaction) => sum + transaction.amount, 0);
+  const payable = transactions.filter((transaction) => transaction.status === "pending_pay").reduce((sum, transaction) => sum + transaction.amount, 0);
+
+  return (
+    <section className="overview-card action-center">
+      <div className="section-title">
+        <div>
+          <span className="metric-label">Action center</span>
+          <h2>รายการที่ต้องตามวันนี้</h2>
+        </div>
+        <span>{transactions.length} รายการค้าง</span>
+      </div>
+      <div className="action-summary">
+        <span><b>{currency(receivable)}</b> ต้องรับเงิน</span>
+        <span><b>{currency(payable)}</b> ต้องจ่าย</span>
+      </div>
+      {transactions.length ? (
+        <div className="action-list">
+          {transactions.map((transaction) => {
+            const business = businesses.find((item) => item.id === transaction.businessId);
+            const age = daysSince(transaction.date);
+            const actionLabel = transaction.status === "pending_receive" ? "รับแล้ว" : "จ่ายแล้ว";
+            return (
+              <article className={`action-item ${transaction.status}`} key={transaction.id}>
+                <button type="button" className="action-main" onClick={() => onEdit(transaction)}>
+                  <span>{transaction.status === "pending_receive" ? "ค้างรับ" : "ค้างจ่าย"} · {age} วัน</span>
+                  <strong>{transaction.title}</strong>
+                  <small>{business?.name ?? "รายการรวม"} · {currency(transaction.amount)}</small>
+                </button>
+                <button type="button" className="small-action action-settle" onClick={() => onSettle(transaction)}>
+                  {actionLabel}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="muted-note">ไม่มีรายการค้างรับหรือค้างจ่าย เปิดงานต่อได้โดยไม่ต้องตามเงินก่อน</p>
+      )}
+    </section>
   );
 }
 

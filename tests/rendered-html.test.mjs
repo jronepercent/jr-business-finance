@@ -11,6 +11,9 @@ test("ProfitLens dashboard client includes the MVP dashboard surface", async () 
   assert.match(dashboardClient, /ProfitLens/);
   assert.match(dashboardClient, /ยอดขายรวม/);
   assert.match(dashboardClient, /กำไรจริง/);
+  assert.match(dashboardClient, /Action center/);
+  assert.match(dashboardClient, /รายการที่ต้องตามวันนี้/);
+  assert.match(dashboardClient, /settlePendingTransaction/);
   assert.match(dashboardClient, /ค้างรับ/);
   assert.match(dashboardClient, /ค้างจ่าย/);
   assert.match(types, /type TransactionType/);
