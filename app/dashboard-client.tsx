@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, FormEvent, useMemo, useState, useTransition } from "react";
+import { CSSProperties, ChangeEvent, FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { categoryOptions } from "@/lib/default-categories";
 import type { Allocation, Business, Category, Status, Transaction, TransactionType } from "@/lib/types";
 import { signOut } from "@/lib/auth/actions";
@@ -52,6 +52,23 @@ type TransactionInput = {
   businessId?: string;
   allocations?: Allocation[];
 };
+
+type MonthlyGoals = {
+  sales: string;
+  realProfit: string;
+};
+
+const defaultMonthlyGoals: MonthlyGoals = { sales: "100000", realProfit: "30000" };
+
+function loadMonthlyGoals() {
+  if (typeof window === "undefined") return defaultMonthlyGoals;
+  try {
+    const saved = window.localStorage.getItem("profitlens-monthly-goals");
+    return saved ? (JSON.parse(saved) as MonthlyGoals) : defaultMonthlyGoals;
+  } catch {
+    return defaultMonthlyGoals;
+  }
+}
 
 const typeLabels: Record<TransactionType, string> = {
   income: "เงินเข้า",
@@ -119,6 +136,55 @@ function settledStatus(status: Status): Status {
   if (status === "pending_receive") return "received";
   if (status === "pending_pay") return "paid";
   return status;
+}
+
+function monthDays(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  return new Date(year, monthIndex, 0).getDate();
+}
+
+function elapsedMonthDays(month: string) {
+  const current = currentMonthKey();
+  if (month < current) return monthDays(month);
+  if (month > current) return 1;
+  return new Date().getDate();
+}
+
+function parseCSVLine(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (const char of line) {
+    if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function transactionTypeFromText(value: string): TransactionType {
+  const normalized = value.trim().toLowerCase();
+  if (["cost", "ต้นทุน"].includes(normalized)) return "cost";
+  if (["expense", "เงินออก", "ค่าใช้จ่าย"].includes(normalized)) return "expense";
+  if (["owner_contribution", "เติมเงิน"].includes(normalized)) return "owner_contribution";
+  if (["owner_withdrawal", "ถอนเงิน"].includes(normalized)) return "owner_withdrawal";
+  if (["transfer", "โอน"].includes(normalized)) return "transfer";
+  return "income";
+}
+
+function statusForType(type: TransactionType, value?: string): Status {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "pending_receive" || normalized === "ค้างรับ") return "pending_receive";
+  if (normalized === "pending_pay" || normalized === "ค้างจ่าย") return "pending_pay";
+  if (normalized === "paid" || normalized === "จ่ายแล้ว") return "paid";
+  if (normalized === "received" || normalized === "รับแล้ว") return "received";
+  return type === "income" || type === "owner_contribution" ? "received" : "paid";
 }
 
 function getTransactionShares(transaction: Transaction, businesses: Business[]) {
@@ -215,7 +281,22 @@ export default function DashboardClient({
   const [newCategory, setNewCategory] = useState({ type: "income" as TransactionType, name: "", icon: "↗" });
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [pendingError, setPendingError] = useState<string | null>(null);
+  const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoals>(() => loadMonthlyGoals());
   const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("profitlens-monthly-goals", JSON.stringify(monthlyGoals));
+    } catch {
+      // Goals are an enhancement; storage failures should not block the app.
+    }
+  }, [monthlyGoals]);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    }
+  }, []);
 
   const filteredTransactions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -281,6 +362,15 @@ export default function DashboardClient({
   );
 
   const margin = total.income ? (total.realProfit / total.income) * 100 : 0;
+  const suggestedCategory = useMemo(() => {
+    const query = form.title.trim().toLowerCase();
+    if (!query) return "";
+    const typeCategories = categoriesByType[form.type];
+    const direct = typeCategories.find((category) => query.includes(category.name.toLowerCase()));
+    if (direct) return direct.name;
+    const learned = transactions.find((transaction) => transaction.type === form.type && query.includes(transaction.title.toLowerCase().slice(0, 6)))?.category;
+    return learned && typeCategories.some((category) => category.name === learned) ? learned : "";
+  }, [categoriesByType, form.title, form.type, transactions]);
   const topExpense = useMemo(() => {
     const categoryTotals = new Map<string, number>();
     filteredTransactions
@@ -403,6 +493,61 @@ export default function DashboardClient({
         setPendingError("อัปเดตสถานะรายการค้างไม่สำเร็จ กรุณาลองใหม่");
       }
     });
+  }
+
+  function importTransactions(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = String(reader.result ?? "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map(parseCSVLine);
+      const hasHeader = rows[0]?.some((cell) => /date|วันที่/i.test(cell));
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      const imported = dataRows
+        .map(([date, type, title, category, amount, status, businessName]) => {
+          const transactionType = transactionTypeFromText(type ?? "");
+          const business = businesses.find((item) => item.name.toLowerCase() === String(businessName ?? "").toLowerCase()) ?? businesses[0];
+          return {
+            date: date || todayISO(),
+            type: transactionType,
+            title: title || "Imported transaction",
+            category: category || firstCategoryName(categories, transactionType),
+            amount: Number(String(amount ?? "0").replace(/,/g, "")),
+            status: statusForType(transactionType, status),
+            businessId: business?.id,
+          } satisfies TransactionInput;
+        })
+        .filter((item) => item.amount > 0 && item.businessId);
+
+      if (!imported.length) {
+        setPendingError("นำเข้าไฟล์ไม่สำเร็จ ตรวจรูปแบบ CSV: date,type,title,category,amount,status,business");
+        return;
+      }
+
+      setPendingError(null);
+      startTransition(async () => {
+        try {
+          const saved: Transaction[] = [];
+          for (const item of imported) {
+            saved.push(await createTransactionAction(item));
+          }
+          setTransactions((items) => [...saved, ...items]);
+        } catch {
+          setPendingError("นำเข้ารายการไม่สำเร็จ กรุณาตรวจข้อมูลในไฟล์แล้วลองใหม่");
+        }
+      });
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  function printMonthlyReport() {
+    window.print();
   }
 
   function addBusiness(event: FormEvent) {
@@ -687,6 +832,9 @@ export default function DashboardClient({
                     <Kpi label="ค้างจ่าย" value={total.payable} tone="pending" />
                   </div>
 
+                  <GoalPanel goals={monthlyGoals} month={selectedMonth} total={total} onChange={setMonthlyGoals} />
+                  <BusinessHealthBrief total={total} summaries={visibleSummaries} />
+
                   <PendingActionCenter
                     transactions={pendingActionItems.slice(0, 4)}
                     businesses={businesses}
@@ -751,6 +899,10 @@ export default function DashboardClient({
                       ＋ {typeLabels[type]}
                     </button>
                   ))}
+                  <label className="import-button">
+                    Import CSV
+                    <input type="file" accept=".csv,text/csv" onChange={importTransactions} />
+                  </label>
                 </div>
                 {filteredTransactions.length ? (
                   <TransactionList transactions={filteredTransactions} businesses={businesses} onEdit={openEditTransaction} onDelete={deleteTransactionHandler} />
@@ -761,8 +913,13 @@ export default function DashboardClient({
             )}
 
             {activeView === "reports" && (
-              <section className="reports-grid">
-                <ReportCard title="กำไรรายเดือน" rows={[["รายได้", total.income], ["ต้นทุน", total.cost], ["เงินออก", total.expense], ["กำไรจริง", total.realProfit]]} />
+              <section className="view-stack">
+                <div className="quick-actions">
+                  <button type="button" className="primary-button" onClick={printMonthlyReport}>Export / Print PDF</button>
+                </div>
+                <BusinessComparison summaries={visibleSummaries} />
+                <div className="reports-grid">
+                  <ReportCard title="กำไรรายเดือน" rows={[["รายได้", total.income], ["ต้นทุน", total.cost], ["เงินออก", total.expense], ["กำไรจริง", total.realProfit]]} />
                 <div className="panel">
                   <h2>เปรียบเทียบธุรกิจ</h2>
                   {visibleSummaries.map((item) => (
@@ -775,6 +932,7 @@ export default function DashboardClient({
                     const value = filteredTransactions.filter((item) => item.type === "expense" && item.category === category).reduce((sum, item) => sum + item.amount, 0);
                     return <BarRow key={category} label={category} value={value} max={Math.max(topExpense?.[1] ?? 1, 1)} color="#DC2626" />;
                   })}
+                </div>
                 </div>
               </section>
             )}
@@ -809,6 +967,7 @@ export default function DashboardClient({
                   </div>
                   <MiniChart summaries={visibleSummaries} total={total} />
                 </div>
+                <CashflowCalendar transactions={filteredTransactions} />
               </section>
             )}
 
@@ -1028,6 +1187,15 @@ export default function DashboardClient({
               <label className="wide">
                 ชื่อรายการ
                 <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="เช่น ค่าโฆษณา" required />
+                {suggestedCategory && suggestedCategory !== form.category && (
+                  <button
+                    type="button"
+                    className="suggestion-chip"
+                    onClick={() => setForm((current) => ({ ...current, category: suggestedCategory }))}
+                  >
+                    แนะนำหมวด {suggestedCategory}
+                  </button>
+                )}
               </label>
               <label>
                 หมวด
@@ -1122,6 +1290,161 @@ function MiniChart({ summaries, total }: { summaries: BusinessSummary[]; total: 
         </div>
       ))}
     </div>
+  );
+}
+
+function GoalPanel({
+  goals,
+  month,
+  total,
+  onChange,
+}: {
+  goals: MonthlyGoals;
+  month: string;
+  total: { income: number; realProfit: number };
+  onChange: (goals: MonthlyGoals) => void;
+}) {
+  const salesGoal = Number(goals.sales) || 0;
+  const profitGoal = Number(goals.realProfit) || 0;
+  const elapsed = elapsedMonthDays(month);
+  const days = monthDays(month);
+  const expectedRate = clamp((elapsed / days) * 100, 0, 100);
+
+  return (
+    <section className="overview-card goal-panel">
+      <div className="section-title">
+        <div>
+          <span className="metric-label">Monthly goals</span>
+          <h2>เป้าหมายรายเดือน</h2>
+        </div>
+        <span>วันที่ {elapsed}/{days}</span>
+      </div>
+      <div className="goal-inputs">
+        <label>
+          เป้ายอดขาย
+          <input inputMode="numeric" value={goals.sales} onChange={(event) => onChange({ ...goals, sales: event.target.value })} />
+        </label>
+        <label>
+          เป้ากำไรจริง
+          <input inputMode="numeric" value={goals.realProfit} onChange={(event) => onChange({ ...goals, realProfit: event.target.value })} />
+        </label>
+      </div>
+      <div className="goal-list">
+        <GoalProgress label="ยอดขาย" value={total.income} goal={salesGoal} expectedRate={expectedRate} />
+        <GoalProgress label="กำไรจริง" value={total.realProfit} goal={profitGoal} expectedRate={expectedRate} />
+      </div>
+    </section>
+  );
+}
+
+function GoalProgress({ label, value, goal, expectedRate }: { label: string; value: number; goal: number; expectedRate: number }) {
+  const rate = goal > 0 ? clamp((value / goal) * 100, 0, 140) : 0;
+  const pace = rate >= expectedRate ? "ตามแผน" : "ต่ำกว่าแผน";
+  return (
+    <div className="goal-progress">
+      <div>
+        <span>{label}</span>
+        <strong>{currency(value)} / {currency(goal)}</strong>
+      </div>
+      <div className="goal-track">
+        <span style={{ width: `${Math.min(rate, 100)}%` }} />
+        <i style={{ left: `${Math.min(expectedRate, 100)}%` }} />
+      </div>
+      <small>{rate.toFixed(0)}% · {pace}</small>
+    </div>
+  );
+}
+
+function BusinessHealthBrief({ total, summaries }: { total: { income: number; realProfit: number; cash: number; receivable: number; payable: number }; summaries: BusinessSummary[] }) {
+  const bestProfit = [...summaries].sort((a, b) => b.realProfit - a.realProfit)[0];
+  const receivableRatio = total.income ? (total.receivable / total.income) * 100 : 0;
+  const cashRatio = total.income ? (total.cash / total.income) * 100 : 0;
+  const lines = [
+    total.income > 0 ? `เดือนนี้ยอดขายอยู่ที่ ${currency(total.income)} และกำไรจริง ${currency(total.realProfit)}` : "ยังไม่มีรายได้ในเดือนนี้ ควรเริ่มจากบันทึกรายการขายแรก",
+    receivableRatio > 20 ? `เงินค้างรับสูง ${receivableRatio.toFixed(0)}% ของยอดขาย ควรตามเก็บเงินก่อนเพิ่มค่าใช้จ่ายใหม่` : "ระดับเงินค้างรับยังควบคุมได้",
+    cashRatio < 20 && total.income > 0 ? "เงินสดต่ำเมื่อเทียบรายได้ ควรรักษาเงินสดก่อนลงทุนเพิ่ม" : "เงินสดยังพอช่วยให้ธุรกิจเดินต่อได้",
+    bestProfit ? `${bestProfit.business.name} เป็นธุรกิจที่ทำกำไรจริงดีที่สุดในชุดข้อมูลที่เลือก` : "เพิ่มธุรกิจเพื่อเริ่มเทียบประสิทธิภาพ",
+  ];
+
+  return (
+    <section className="overview-card ai-brief">
+      <div className="section-title">
+        <div>
+          <span className="metric-label">AI business brief</span>
+          <h2>สรุปสุขภาพธุรกิจ</h2>
+        </div>
+        <span>Auto</span>
+      </div>
+      <div className="insights">
+        {lines.map((line) => <p key={line}>{line}</p>)}
+      </div>
+    </section>
+  );
+}
+
+function BusinessComparison({ summaries }: { summaries: BusinessSummary[] }) {
+  const bestSales = [...summaries].sort((a, b) => b.income - a.income)[0];
+  const bestProfit = [...summaries].sort((a, b) => b.realProfit - a.realProfit)[0];
+  const cashHeavy = [...summaries].sort((a, b) => b.cash - a.cash)[0];
+  const mostPending = [...summaries].sort((a, b) => (b.receivable + b.payable) - (a.receivable + a.payable))[0];
+  const rows = [
+    ["ขายดีที่สุด", bestSales, bestSales?.income],
+    ["กำไรดีที่สุด", bestProfit, bestProfit?.realProfit],
+    ["เงินสดเยอะสุด", cashHeavy, cashHeavy?.cash],
+    ["เงินค้างเยอะสุด", mostPending, mostPending ? mostPending.receivable + mostPending.payable : 0],
+  ] as const;
+
+  return (
+    <section className="overview-card comparison-card">
+      <div className="section-title">
+        <div>
+          <span className="metric-label">Business comparison</span>
+          <h2>เปรียบเทียบธุรกิจแบบจริงจัง</h2>
+        </div>
+        <span>{summaries.length} ธุรกิจ</span>
+      </div>
+      <div className="comparison-grid">
+        {rows.map(([label, summary, value]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{summary?.business.name ?? "-"}</strong>
+            <b>{currency(value ?? 0)}</b>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CashflowCalendar({ transactions }: { transactions: Transaction[] }) {
+  const days = [...new Map(transactions.map((transaction) => [transaction.date, transaction]))].map(([date]) => date).sort();
+  const visibleDays = days.slice(0, 14);
+  return (
+    <section className="overview-card cash-calendar">
+      <div className="section-title">
+        <div>
+          <span className="metric-label">Cashflow calendar</span>
+          <h2>ปฏิทินเงินเข้าออก</h2>
+        </div>
+        <span>{visibleDays.length} วัน</span>
+      </div>
+      <div className="calendar-list">
+        {visibleDays.length ? visibleDays.map((date) => {
+          const dayTransactions = transactions.filter((transaction) => transaction.date === date);
+          const incoming = dayTransactions.filter((transaction) => transaction.type === "income" || transaction.type === "owner_contribution").reduce((sum, transaction) => sum + transaction.amount, 0);
+          const outgoing = dayTransactions.filter((transaction) => transaction.type === "cost" || transaction.type === "expense" || transaction.type === "owner_withdrawal").reduce((sum, transaction) => sum + transaction.amount, 0);
+          const pending = dayTransactions.filter((transaction) => transaction.status === "pending_receive" || transaction.status === "pending_pay").length;
+          return (
+            <article key={date} className="calendar-day">
+              <time>{new Date(`${date}T00:00:00`).toLocaleDateString("th-TH", { day: "2-digit", month: "short" })}</time>
+              <span>เข้า {currency(incoming)}</span>
+              <span>ออก {currency(outgoing)}</span>
+              <b>{pending} ค้าง</b>
+            </article>
+          );
+        }) : <p className="muted-note">ยังไม่มีรายการในเดือนนี้</p>}
+      </div>
+    </section>
   );
 }
 

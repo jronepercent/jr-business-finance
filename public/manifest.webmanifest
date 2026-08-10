@@ -1,0 +1,19 @@
+{
+  "name": "ProfitLens",
+  "short_name": "ProfitLens",
+  "description": "ติดตามยอดขาย กำไรจริง เงินสด และรายการค้างของหลายธุรกิจ",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#ef2332",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

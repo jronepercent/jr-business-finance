@@ -818,6 +818,144 @@ select option {
   gap: 14px;
 }
 
+.goal-panel,
+.ai-brief,
+.comparison-card,
+.cash-calendar {
+  display: grid;
+  gap: 14px;
+}
+
+.goal-inputs,
+.goal-list,
+.comparison-grid,
+.calendar-list {
+  display: grid;
+  gap: 10px;
+}
+
+.goal-inputs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.goal-inputs label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.goal-progress {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-progress > div:first-child,
+.calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-progress span,
+.goal-progress small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.goal-progress strong {
+  color: #ffffff;
+}
+
+.goal-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.goal-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ef2332, #fb7185);
+}
+
+.goal-track i {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 999px;
+  background: #ffffff;
+  opacity: 0.8;
+}
+
+.comparison-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.comparison-grid article,
+.calendar-day {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.045);
+  padding: 12px;
+}
+
+.comparison-grid span,
+.calendar-day span,
+.calendar-day b {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.comparison-grid strong,
+.comparison-grid b,
+.calendar-day time {
+  display: block;
+  color: #ffffff;
+}
+
+.calendar-day {
+  display: grid;
+  grid-template-columns: 90px repeat(3, minmax(0, 1fr));
+}
+
+.import-button {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+  padding: 0 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.import-button input {
+  display: none;
+}
+
+.suggestion-chip {
+  justify-self: start;
+  min-height: 30px;
+  border: 1px solid rgb(239 35 50 / 0.28);
+  border-radius: 999px;
+  background: rgb(239 35 50 / 0.12);
+  color: #ffffff;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .action-summary,
 .action-list {
   display: grid;
@@ -1718,6 +1856,9 @@ select option {
 
   .dashboard-lower-grid,
   .action-summary,
+  .goal-inputs,
+  .comparison-grid,
+  .calendar-day,
   .balance-row,
   .right-rail,
   .kpi-grid,
@@ -2009,5 +2150,37 @@ select option {
 
   .transaction-modal {
     max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #111827;
+  }
+
+  .sidebar,
+  .topbar,
+  .bottom-nav,
+  .quick-actions,
+  .row-actions,
+  .action-settle {
+    display: none !important;
+  }
+
+  .app-shell,
+  .content,
+  .overview-card,
+  .panel {
+    border: 0;
+    background: #ffffff !important;
+    box-shadow: none;
+    color: #111827;
+  }
+
+  .app-shell {
+    display: block;
+    width: 100%;
+    margin: 0;
   }
 }
