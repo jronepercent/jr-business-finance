@@ -105,6 +105,10 @@ function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 function getTransactionShares(transaction: Transaction, businesses: Business[]) {
   if (transaction.allocations?.length) {
     return transaction.allocations.filter((allocation) => allocation.percent > 0);
@@ -487,9 +491,30 @@ export default function DashboardClient({
               </button>
               {item.id === "transactions" && (
                 <div className="nav-submenu">
-                  <button type="button" onClick={() => setActiveView("transactions")}>History <b>{transactions.length}</b></button>
-                  <button type="button" onClick={() => setActiveView("accounts")}>Integration</button>
-                  <button type="button" onClick={() => setActiveView("reports")}>Reports</button>
+                  <button
+                    aria-current={activeView === "transactions" ? "page" : undefined}
+                    className={activeView === "transactions" ? "active" : ""}
+                    type="button"
+                    onClick={() => setActiveView("transactions")}
+                  >
+                    History <b>{transactions.length}</b>
+                  </button>
+                  <button
+                    aria-current={activeView === "accounts" ? "page" : undefined}
+                    className={activeView === "accounts" ? "active" : ""}
+                    type="button"
+                    onClick={() => setActiveView("accounts")}
+                  >
+                    Integration
+                  </button>
+                  <button
+                    aria-current={activeView === "reports" ? "page" : undefined}
+                    className={activeView === "reports" ? "active" : ""}
+                    type="button"
+                    onClick={() => setActiveView("reports")}
+                  >
+                    Reports
+                  </button>
                 </div>
               )}
             </div>
@@ -1063,8 +1088,16 @@ function RightRail({
   onAdd: () => void;
   onQuickAction: (type: TransactionType, status: Status) => void;
 }) {
-  const cashRatio = total.income ? Math.min(Math.max((total.cash / total.income) * 100, 8), 100) : 8;
-  const healthScore = total.income ? Math.max(Math.min(Math.round((total.realProfit / total.income) * 100 + 55), 98), 12) : 0;
+  const profitMargin = total.income ? (total.realProfit / total.income) * 100 : 0;
+  const cashRatio = total.income ? clamp((total.cash / total.income) * 100, 0, 100) : total.cash > 0 ? 100 : 0;
+  const pendingRatio = total.income ? clamp(((total.receivable + total.payable) / total.income) * 100, 0, 100) : total.receivable + total.payable > 0 ? 100 : 0;
+  const profitScore = clamp(profitMargin * 1.5 + 45, 0, 100);
+  const cashScore = clamp(cashRatio, 0, 100);
+  const riskScore = clamp(100 - pendingRatio, 0, 100);
+  const healthScore = total.income || total.cash || total.receivable || total.payable
+    ? Math.round(profitScore * 0.45 + cashScore * 0.35 + riskScore * 0.2)
+    : 0;
+  const healthTone = healthScore >= 75 ? "strong" : healthScore >= 45 ? "watch" : "risk";
 
   return (
     <aside className="right-rail">
@@ -1094,9 +1127,19 @@ function RightRail({
           <h2>Financial health</h2>
           <span>30d</span>
         </div>
-        <div className="health-ring" style={{ "--score": `${healthScore}%` } as CSSProperties}>
+        <div
+          aria-label={`Financial health ${healthScore} percent`}
+          className={`health-ring ${healthTone}`}
+          role="img"
+          style={{ "--score": `${healthScore}%` } as CSSProperties}
+        >
           <strong>{healthScore}%</strong>
           <span>ความแข็งแรง</span>
+        </div>
+        <div className="health-breakdown">
+          <span><b>{profitMargin.toFixed(0)}%</b> margin</span>
+          <span><b>{cashRatio.toFixed(0)}%</b> cash</span>
+          <span><b>{pendingRatio.toFixed(0)}%</b> pending</span>
         </div>
         <p>เงินสดเทียบรายได้ {cashRatio.toFixed(0)}% · ค้างรับ {currency(total.receivable)}</p>
       </section>

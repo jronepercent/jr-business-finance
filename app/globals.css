@@ -251,23 +251,42 @@ button {
 
 .nav-submenu {
   display: grid;
-  gap: 2px;
-  margin: -2px 0 8px 28px;
-  border-left: 1px solid var(--border);
-  padding-left: 12px;
+  gap: 6px;
+  margin: -2px 0 10px 27px;
+  border-left: 1px solid rgb(239 35 50 / 0.24);
+  padding: 3px 0 3px 10px;
 }
 
 .nav-submenu button {
   display: flex;
   align-items: center;
-  min-height: 26px;
-  border: 0;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
-  padding: 0;
+  padding: 0 8px;
   text-align: left;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.nav-submenu button:hover,
+.nav-submenu button.active {
+  border-color: rgb(239 35 50 / 0.32);
+  background:
+    linear-gradient(90deg, rgb(239 35 50 / 0.18), rgb(239 35 50 / 0.04));
+  color: #ffffff;
+}
+
+.nav-submenu button.active {
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .sidebar-footer {
@@ -932,15 +951,31 @@ select option {
 
 .health-ring {
   --score: 75%;
+  --health-tone: var(--primary);
   display: grid;
   place-items: center;
-  width: 164px;
-  height: 164px;
+  width: 172px;
+  height: 172px;
   margin: 18px auto 6px;
   border-radius: 999px;
   background:
-    radial-gradient(circle, #101012 0 58%, transparent 59%),
-    conic-gradient(var(--primary) 0 42%, var(--cash-flow) 42% var(--score), rgb(255 255 255 / 0.08) 0);
+    radial-gradient(circle, #101012 0 57%, transparent 58%),
+    conic-gradient(var(--health-tone) 0 var(--score), rgb(255 255 255 / 0.08) 0);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.34),
+    0 0 40px color-mix(in srgb, var(--health-tone) 28%, transparent);
+}
+
+.health-ring.strong {
+  --health-tone: #fb2940;
+}
+
+.health-ring.watch {
+  --health-tone: #f59e0b;
+}
+
+.health-ring.risk {
+  --health-tone: #64748b;
 }
 
 .health-ring strong,
@@ -951,7 +986,9 @@ select option {
 
 .health-ring strong {
   align-self: center;
-  font-size: 28px;
+  color: #ffffff;
+  font-size: 31px;
+  font-weight: 950;
 }
 
 .health-ring span {
@@ -960,6 +997,32 @@ select option {
   color: var(--muted);
   font-size: 11px;
   font-weight: 900;
+}
+
+.health-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.health-breakdown span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.045);
+  padding: 8px 6px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.health-breakdown b {
+  color: #ffffff;
+  font-size: 13px;
 }
 
 .rail-transaction-list {
