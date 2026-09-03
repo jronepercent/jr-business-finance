@@ -1,6 +1,7 @@
 "use client";
 
 import { CSSProperties, ChangeEvent, FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { categoryOptions } from "@/lib/default-categories";
 import type { Allocation, Business, Category, Status, Transaction, TransactionType } from "@/lib/types";
 import { signOut } from "@/lib/auth/actions";
@@ -1154,7 +1155,7 @@ export default function DashboardClient({
         </button>
       </nav>
 
-      {isTransactionOpen && (
+      {isTransactionOpen && createPortal(
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="เพิ่มหรือแก้ไขรายการ">
           <form className="transaction-modal" onSubmit={saveTransaction}>
             <div className="modal-header">
@@ -1244,7 +1245,8 @@ export default function DashboardClient({
             </div>
             <button className="primary-button full" type="submit">บันทึก</button>
           </form>
-        </div>
+        </div>,
+        document.body,
       )}
     </main>
   );

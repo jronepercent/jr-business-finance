@@ -1867,9 +1867,29 @@ select option {
   .feature-card-grid,
   .feature-layout,
   .learning-grid,
-  .form-grid,
-  .type-picker {
+  .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .type-picker {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    margin: 10px -2px;
+    padding: 2px;
+    scrollbar-width: none;
+  }
+
+  .type-picker::-webkit-scrollbar {
+    display: none;
+  }
+
+  .type-picker button {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 16px;
+    white-space: nowrap;
   }
 
   .balance-row strong {
