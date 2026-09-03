@@ -8,8 +8,8 @@ declare global {
 
 function getPool() {
   if (!global.__plPool) {
-    const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-    if (!connectionString) throw new Error("DIRECT_URL or DATABASE_URL is not set");
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) throw new Error("DATABASE_URL is not set");
     global.__plPool = new Pool({ connectionString, max: 3 });
   }
   return global.__plPool;
