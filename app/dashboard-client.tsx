@@ -111,6 +111,22 @@ function currency(value: number) {
   }).format(value);
 }
 
+function displayDate(date: string) {
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${date}T00:00:00`));
+}
+
+function sortTransactionsByDateDesc(items: Transaction[]) {
+  return [...items].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    if (byDate !== 0) return byDate;
+    return b.id.localeCompare(a.id);
+  });
+}
+
 function monthKey(date: string) {
   return date.slice(0, 7);
 }
@@ -301,7 +317,7 @@ export default function DashboardClient({
 
   const filteredTransactions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return transactions.filter((transaction) => {
+    return sortTransactionsByDateDesc(transactions.filter((transaction) => {
       const monthMatch = monthKey(transaction.date) === selectedMonth;
       const businessMatch =
         selectedBusiness === "all" ||
@@ -315,14 +331,14 @@ export default function DashboardClient({
         : (businesses.find((business) => business.id === transaction.businessId)?.name ?? "");
       const haystack = `${transaction.title} ${transaction.category} ${relatedBusinessNames}`.toLowerCase();
       return haystack.includes(query);
-    });
+    }));
   }, [transactions, selectedMonth, selectedBusiness, searchQuery, businesses]);
 
   const pendingNotifications = useMemo(
     () =>
-      [...transactions]
-        .filter((transaction) => transaction.status === "pending_receive" || transaction.status === "pending_pay")
-        .sort((a, b) => (a.date < b.date ? 1 : -1)),
+      sortTransactionsByDateDesc(
+        transactions.filter((transaction) => transaction.status === "pending_receive" || transaction.status === "pending_pay"),
+      ),
     [transactions],
   );
   const pendingActionItems = useMemo(
@@ -1589,12 +1605,12 @@ function RightRail({
           <span>ล่าสุด</span>
         </div>
         <div className="rail-transaction-list">
-          {transactions.map((transaction) => (
+          {sortTransactionsByDateDesc(transactions).map((transaction) => (
             <div className="rail-transaction" key={transaction.id}>
               <span className={`rail-icon ${transaction.type}`}>{typeLabels[transaction.type].slice(0, 1)}</span>
               <div>
                 <strong>{transaction.title}</strong>
-                <small>{statusLabels[transaction.status]}</small>
+                <small>{displayDate(transaction.date)} · {statusLabels[transaction.status]}</small>
               </div>
               <b>{currency(transaction.amount)}</b>
             </div>
@@ -1625,7 +1641,7 @@ function TransactionList({
         <span>{transactions.length} รายการ</span>
       </div>
       <div className="transaction-list">
-        {transactions.map((transaction) => {
+        {sortTransactionsByDateDesc(transactions).map((transaction) => {
           const business = businesses.find((item) => item.id === transaction.businessId);
           const shared = transaction.allocations?.length;
           return (
@@ -1633,7 +1649,7 @@ function TransactionList({
               <div className={`type-dot ${transaction.type}`} />
               <div>
                 <strong>{transaction.title}</strong>
-                <span>{typeLabels[transaction.type]} · {transaction.category} · {business?.name ?? (shared ? "รายการร่วม" : "-")}</span>
+                <span>{displayDate(transaction.date)} · {typeLabels[transaction.type]} · {transaction.category} · {business?.name ?? (shared ? "รายการร่วม" : "-")}</span>
               </div>
               <div className="transaction-money">
                 <strong>{currency(transaction.amount)}</strong>
