@@ -27,24 +27,36 @@ export async function signUp(formData: FormData) {
     redirect(`/signup?error=${encodeURIComponent("รหัสผ่านไม่ตรงกัน")}`);
   }
 
-  const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
+  let existing;
+  try {
+    existing = await db.query.users.findFirst({ where: eq(users.email, email) });
+  } catch (error) {
+    console.error("Sign up database lookup failed", error);
+    redirect(`/signup?error=${encodeURIComponent("เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจค่า DIRECT_URL / DATABASE_URL")}`);
+  }
+
   if (existing) {
     redirect(`/signup?error=${encodeURIComponent("มีบัญชีนี้อยู่แล้ว")}`);
   }
 
-  const passwordHash = await hashPassword(password);
-  const [user] = await db.insert(users).values({ email, passwordHash }).returning();
+  try {
+    const passwordHash = await hashPassword(password);
+    const [user] = await db.insert(users).values({ email, passwordHash }).returning();
 
-  await db.insert(categories).values(
-    defaultCategories.map((category) => ({
-      userId: user.id,
-      type: category.type,
-      name: category.name,
-      icon: category.icon,
-    })),
-  );
+    await db.insert(categories).values(
+      defaultCategories.map((category) => ({
+        userId: user.id,
+        type: category.type,
+        name: category.name,
+        icon: category.icon,
+      })),
+    );
 
-  await createSession(user.id, user.email);
+    await createSession(user.id, user.email);
+  } catch (error) {
+    console.error("Sign up failed", error);
+    redirect(`/signup?error=${encodeURIComponent("สมัครสมาชิกไม่สำเร็จ กรุณาตรวจการเชื่อมต่อฐานข้อมูลและ AUTH_SECRET")}`);
+  }
   redirect("/");
 }
 
@@ -52,12 +64,24 @@ export async function signIn(formData: FormData) {
   const email = normalizeEmail(formData.get("email"));
   const password = String(formData.get("password") ?? "");
 
-  const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  let user;
+  try {
+    user = await db.query.users.findFirst({ where: eq(users.email, email) });
+  } catch (error) {
+    console.error("Sign in database lookup failed", error);
+    redirect(`/login?error=${encodeURIComponent("เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจค่า DIRECT_URL / DATABASE_URL")}`);
+  }
+
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     redirect(`/login?error=${encodeURIComponent("อีเมลหรือรหัสผ่านไม่ถูกต้อง")}`);
   }
 
-  await createSession(user.id, user.email);
+  try {
+    await createSession(user.id, user.email);
+  } catch (error) {
+    console.error("Sign in session creation failed", error);
+    redirect(`/login?error=${encodeURIComponent("สร้าง session ไม่สำเร็จ กรุณาตรวจค่า AUTH_SECRET")}`);
+  }
   redirect("/");
 }
 
